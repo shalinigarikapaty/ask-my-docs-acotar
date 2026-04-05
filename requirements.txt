@@ -1,0 +1,6 @@
+chromadb
+streamlit
+langchain
+langchain-aws
+boto3
+pypdf
