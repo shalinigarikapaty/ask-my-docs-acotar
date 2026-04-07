@@ -1,0 +1,73 @@
+[
+  {
+    "question": "Who is Feyre's mate?",
+    "ground_truth": "Rhysand is Feyre's mate. They share a soul-bonded connection.",
+    "type": "factual"
+  },
+  {
+    "question": "What is Velaris?",
+    "ground_truth": "Velaris is the City of Starlight, the hidden capital of the Night Court that Rhysand has kept secret for 500 years.",
+    "type": "descriptive"
+  },
+  {
+    "question": "What happened at Starfall?",
+    "ground_truth": "Feyre and Rhysand danced together at Starfall, a yearly event where spirits migrate across the sky. It was a turning point in their relationship.",
+    "type": "event"
+  },
+  {
+    "question": "Who is Morrigan?",
+    "ground_truth": "Morrigan, also called Mor, is Rhysand's cousin and the Third in Command of the Night Court. She has the power of truth and is one of the most powerful beings in history.",
+    "type": "factual"
+  },
+  {
+    "question": "Who is the King of Hybern?",
+    "ground_truth": "The King of Hybern is the main antagonist who seeks to use the Cauldron to destroy the wall between the human and faerie worlds.",
+    "type": "factual"
+  },
+  {
+    "question": "What is the Cauldron?",
+    "ground_truth": "The Cauldron is a powerful magical object that the King of Hybern seeks to use to destroy the wall separating the human and faerie worlds.",
+    "type": "descriptive"
+  },
+  {
+    "question": "Why did Rhys hide the mating bond from Feyre?",
+    "ground_truth": "Rhys hid the mating bond to protect Feyre. He feared that if their enemies knew she was his mate they would use her against him and do unspeakable things to her.",
+    "type": "analytical"
+  },
+  {
+    "question": "Who is Cassian?",
+    "ground_truth": "Cassian is an Illyrian warrior and one of Rhysand's closest companions and generals in the Night Court.",
+    "type": "factual"
+  },
+  {
+    "question": "What is the Night Court?",
+    "ground_truth": "The Night Court is one of the seven fae courts ruled by Rhysand as High Lord. It contains Velaris, the City of Starlight, and the Illyrian mountains.",
+    "type": "descriptive"
+  },
+  {
+    "question": "Who is Azriel?",
+    "ground_truth": "Azriel is Rhysand's spymaster and an Illyrian warrior. He is shadowsinger who commands shadows and is one of the Inner Circle.",
+    "type": "factual"
+  },
+  {
+    "question": "What is the Court of Nightmares’ actual name?",
+    "ground_truth": "Hewn City",
+    "type": "factual"
+  },
+  {
+    "question":"What does Feyre’s father do for income after becoming destitute?",
+    "ground_truth": "Sells his whittled figurines",
+    "type":"factual"
+  },
+  {
+    "question" : "Why did Rhysand become a whore to Amarantha?",
+    "ground_truth" :"Rhysand reveals that Amarantha wanted to kill and torture anyone who was close to him, but he shielded them by becoming her whore.",
+    "type": "descriptive"
+  },
+  {
+    "question": "What are her powers?",
+    "ground_truth": "Morrigan has the power of truth and can winnow across great distances instantly.",
+    "type": "multi-turn",
+    "context": "Previous question was about Morrigan"
+}
+]
