@@ -1,6 +1,6 @@
 import streamlit as st
 from retriever import load_vectorstore, build_bm25_index, retrieve
-from citation_chain import load_llm, answer_with_citations
+from citation_chain import load_llm, answer_with_citations, stream_answer_with_citations 
 
 # ─── Page config ─────────────────────────────────────────
 st.set_page_config(
@@ -59,37 +59,59 @@ with col1:
 
         # Generate answer
         with st.chat_message("assistant"):
-            with st.spinner("Searching the book..."):
-                try:
-                    chat_history    = st.session_state.messages[-6:] if st.session_state.messages else None
-                    chunks          = retrieve(prompt, vs, bm25, docs, metas)
-                    answer, sources = answer_with_citations(
-                        prompt,
-                        chunks,
-                        llm,
-                        chat_history=chat_history
-                    )
+            try:
+                chat_history = st.session_state.messages[-6:] if st.session_state.messages else None
 
-                    st.markdown(answer)
-                    with st.expander("View Sources"):
-                        for s in sources:
-                            st.markdown(f"**{s['label']} — Page {s['page']}**")
-                            st.caption(s['text'][:300])
-                            st.divider()
+                status = st.status("Reading ACOTAR...", expanded=True)
+                with status:
+                    st.write("🔍 Searching with keywords (BM25)...")
+                    import time; time.sleep(0.4)
+                    st.write("🧠 Searching by meaning (vector search)...")
+                    import time; time.sleep(0.4)
+                    st.write("⚖️ Combining results (Reciprocal Rank Fusion)...")
+                    chunks = retrieve(prompt, vs, bm25, docs, metas)
+                    st.write("🎯 Reranking for precision (cross-encoder)...")
+                    import time; time.sleep(0.3)
+                    st.write("✍️ Generating answer with citations...")
+                    status.update(label="Found relevant passages", state="complete")
+                   
 
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": answer,
-                        "sources": sources
-                    })
+                # Stream the response
+                answer_placeholder = st.empty()
+                full_answer        = ""
+                final_sources      = []
 
-                except Exception as e:
-                    error_msg = f"Something went wrong: {str(e)}"
-                    st.error(error_msg)
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": error_msg
-                    })
+                for token, sources in stream_answer_with_citations(
+                    prompt, chunks, llm, chat_history=chat_history
+                ):
+                    if token is not None:
+                        full_answer += token
+                        answer_placeholder.markdown(full_answer + "▌")
+                    else:
+                        final_sources = sources
+
+                # Final render without cursor
+                answer_placeholder.markdown(full_answer)
+
+                with st.expander("View Sources"):
+                    for s in final_sources:
+                        st.markdown(f"**{s['label']} — Page {s['page']}**")
+                        st.caption(s['text'][:300])
+                        st.divider()
+
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": full_answer,
+                    "sources": final_sources
+                })
+
+            except Exception as e:
+                error_msg = f"Something went wrong: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg
+                })
 
 with col2:
     st.subheader("Session Stats")

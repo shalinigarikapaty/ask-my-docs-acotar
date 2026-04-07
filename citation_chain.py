@@ -14,10 +14,10 @@ def load_llm():
     return ChatBedrock(
         model_id=LLM_MODEL,
         region_name=REGION,
+        streaming=True,
          model_kwargs={
             "temperature": TEMPERATURE,
-            "max_tokens":  int(os.getenv("MAX_TOKENS", "1000")),
-            "top_p":       float(os.getenv("TOP_P", "0.9")),
+            "max_tokens":  int(os.getenv("MAX_TOKENS", "1000"))
         }
     )
 
@@ -39,7 +39,31 @@ def format_context(chunks):
         })
 
     return "\n\n".join(context_parts), sources
+#-------Streaming-------------------------------------------
+def stream_answer_with_citations(question, chunks, llm, chat_history=None):
+    context, sources = format_context(chunks)
+    system, user     = build_prompt(question, context)
 
+    # Build message list with history
+    messages = [SystemMessage(content=system)]
+
+    if chat_history:
+        for turn in chat_history:
+            if turn["role"] == "user":
+                messages.append(HumanMessage(content=turn["content"]))
+            elif turn["role"] == "assistant":
+                messages.append(AIMessage(content=turn["content"]))
+
+    messages.append(HumanMessage(content=user))
+
+    # Stream tokens as they arrive
+    full_response = ""
+    for chunk in llm.stream(messages):
+        token = chunk.content
+        full_response += token
+        yield token, None  # yield token, sources not ready yet
+
+    yield None, sources  # final yield — signals completion with sources
 # ─── Build prompt with citations instruction ──────────────
 def build_prompt(question, context):
     system = """You are an expert assistant for the book 
