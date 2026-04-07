@@ -1,15 +1,24 @@
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+import os
+from dotenv import load_dotenv
 
-# ─── Configuration ───────────────────────────────────────
-LLM_MODEL  = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-REGION     = "us-east-1"
+load_dotenv()
+# ─── Load Configuration ───────────────────────────────────────
+LLM_MODEL   = os.getenv("LLM_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+REGION      = os.getenv("AWS_REGION", "us-east-1")
+TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
 
 # ─── Load LLM ────────────────────────────────────────────
 def load_llm():
     return ChatBedrock(
         model_id=LLM_MODEL,
-        region_name=REGION
+        region_name=REGION,
+         model_kwargs={
+            "temperature": TEMPERATURE,
+            "max_tokens":  int(os.getenv("MAX_TOKENS", "1000")),
+            "top_p":       float(os.getenv("TOP_P", "0.9")),
+        }
     )
 
 # ─── Format chunks with source labels ────────────────────
