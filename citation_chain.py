@@ -8,18 +8,35 @@ load_dotenv()
 LLM_MODEL   = os.getenv("LLM_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 REGION      = os.getenv("AWS_REGION", "us-east-1")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
+GUARDRAIL_ID      = os.getenv("GUARDRAIL_ID")
+GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "1")
 
 # ─── Load LLM ────────────────────────────────────────────
 def load_llm():
-    return ChatBedrock(
-        model_id=LLM_MODEL,
-        region_name=REGION,
-        streaming=True,
-         model_kwargs={
-            "temperature": TEMPERATURE,
-            "max_tokens":  int(os.getenv("MAX_TOKENS", "1000"))
+    llm_kwargs = {
+        "model_id":    LLM_MODEL,
+        "region_name": REGION,
+        "streaming":   True,
+        "model_kwargs": {
+            "temperature":   TEMPERATURE,
+            "max_tokens":    int(os.getenv("MAX_TOKENS", "700")),
+            "stop_sequences": [
+                "\nHuman:",
+                "\nQuestion:",
+                "[END]",
+            ]
         }
-    )
+    }
+
+    if GUARDRAIL_ID:
+        llm_kwargs["guardrails"] = {
+            "guardrailIdentifier": GUARDRAIL_ID,
+            "guardrailVersion":    GUARDRAIL_VERSION,
+            "trace":               "enabled"
+        }
+
+    return ChatBedrock(**llm_kwargs)  # ← this was missing
+    
 
 # ─── Format chunks with source labels ────────────────────
 def format_context(chunks):
@@ -92,24 +109,40 @@ Answer with citations:"""
     return system, user
 
 # ─── Generate answer with citations ──────────────────────
-def answer_with_citations(question, chunks, llm,chat_history=None):
+def answer_with_citations(question, chunks, llm, chat_history=None):
     context, sources = format_context(chunks)
-    system, user = build_prompt(question, context)
-# Build message list with history
+    system, user     = build_prompt(question, context)
+
     messages = [SystemMessage(content=system)]
-  # Add previous turns if they exist
+
     if chat_history:
         for turn in chat_history:
             if turn["role"] == "user":
                 messages.append(HumanMessage(content=turn["content"]))
             elif turn["role"] == "assistant":
                 messages.append(AIMessage(content=turn["content"]))
-                
-    # Add current question
+
     messages.append(HumanMessage(content=user))
 
-    response = llm.invoke(messages)
-    return response.content, sources
+    try:
+        response = llm.invoke(messages)
+
+        # Guardrail returns blocked message as content instead of raising
+        # Check for it and return empty sources so UI doesn't show citations
+        if "I can only answer questions about A Court of Mist and Fury" in response.content:
+            return response.content, []
+
+        return response.content, sources
+
+    except Exception as e:
+        error = str(e)
+        if "GuardrailIntervention" in error or "blocked" in error.lower():
+            return (
+                "I can only answer questions about A Court of Mist and Fury. "
+                "Try asking about the characters, plot, or lore of the book.",
+                []
+            )
+        raise
 
 # ─── Test function ────────────────────────────────────────
 if __name__ == "__main__":

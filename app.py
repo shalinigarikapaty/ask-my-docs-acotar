@@ -1,6 +1,10 @@
 import streamlit as st
+import boto3
+import os
+import time
 from retriever import load_vectorstore, build_bm25_index, retrieve
-from citation_chain import load_llm, answer_with_citations, stream_answer_with_citations 
+from citation_chain import load_llm, stream_answer_with_citations
+from ui import inject_theme, render_title, render_sources, render_blocked, render_sidebar
 
 # ─── Page config ─────────────────────────────────────────
 st.set_page_config(
@@ -9,74 +13,118 @@ st.set_page_config(
     layout="wide"
 )
 
+# ─── Inject Night Court theme ─────────────────────────────
+inject_theme()
+
+# ─── Guardrail pre-check ──────────────────────────────────
+def is_blocked_by_guardrail(question: str) -> tuple:
+    BLOCKED_MESSAGE = (
+        "I can only answer questions about A Court of Mist and Fury. "
+        "Try asking about the characters, plot, or lore of the book."
+    )
+
+    # Layer 1 — keyword check, no Bedrock call
+    how_to_signals = [
+        "step by step", "how to make", "how do i make",
+        "how do you make", "recipe", "instructions for",
+        "teach me how", "give me steps", "walk me through"
+    ]
+    if any(signal in question.lower() for signal in how_to_signals):
+        return True, BLOCKED_MESSAGE
+
+    # Layer 2 — Bedrock guardrail
+    guardrail_id      = os.getenv("GUARDRAIL_ID")
+    guardrail_version = os.getenv("GUARDRAIL_VERSION", "1")
+
+    if not guardrail_id:
+        return False, ""
+
+    try:
+        client = boto3.client(
+            "bedrock-runtime",
+            region_name=os.getenv("AWS_REGION", "us-east-1")
+        )
+        response = client.apply_guardrail(
+            guardrailIdentifier=guardrail_id,
+            guardrailVersion=guardrail_version,
+            source="INPUT",
+            content=[{"text": {"text": question}}]
+        )
+        if response["action"] == "GUARDRAIL_INTERVENED":
+            return True, BLOCKED_MESSAGE
+    except Exception:
+        return False, ""  # fail open
+
+    return False, ""
+
+
 # ─── Load components once ────────────────────────────────
 @st.cache_resource
 def load_components():
-    print("Loading retrieval components...")
     vs                = load_vectorstore()
     bm25, docs, metas = build_bm25_index(vs)
     llm               = load_llm()
-    print("All components loaded.")
     return vs, bm25, docs, metas, llm
 
 vs, bm25, docs, metas, llm = load_components()
 
-# ─── UI Layout ───────────────────────────────────────────
-st.title("Ask My Docs")
-st.caption("A Court of Mist and Fury — Sarah J. Maas")
-st.divider()
+# ─── Session state ────────────────────────────────────────
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-col1, col2 = st.columns([2, 1])
+# ─── Sidebar ─────────────────────────────────────────────
+should_clear = render_sidebar(st.session_state.messages)
+if should_clear:
+    st.session_state.messages = []
+    st.rerun()
 
-with col1:
-    st.subheader("Chat")
+# ─── Title ───────────────────────────────────────────────
+render_title()
 
-    # Chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# ─── Chat history ─────────────────────────────────────────
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+        if message.get("sources"):
+            render_sources(message["sources"])
 
-    # Display chat history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-            if "sources" in message:
-                with st.expander("View Sources"):
-                    for s in message["sources"]:
-                        st.markdown(f"**{s['label']} — Page {s['page']}**")
-                        st.caption(s['text'][:300])
-                        st.divider()
+# ─── Chat input ───────────────────────────────────────────
+if prompt := st.chat_input("Ask anything about the book..."):
 
-    # Chat input
-    if prompt := st.chat_input("Ask anything about the book..."):
+    # Show user message
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-        # Show user message
+    # ── Guardrail check — before retrieval ────────────────
+    blocked, blocked_message = is_blocked_by_guardrail(prompt)
+
+    if blocked:
+        with st.chat_message("assistant"):
+            render_blocked(blocked_message)
         st.session_state.messages.append({
-            "role": "user",
-            "content": prompt
+            "role": "assistant",
+            "content": blocked_message
         })
-        with st.chat_message("user"):
-            st.markdown(prompt)
 
-        # Generate answer
+    else:
+        # ── Full pipeline ─────────────────────────────────
         with st.chat_message("assistant"):
             try:
                 chat_history = st.session_state.messages[-6:] if st.session_state.messages else None
 
-                status = st.status("Reading ACOTAR...", expanded=True)
-                with status:
-                    st.write("🔍 Searching with keywords (BM25)...")
-                    import time; time.sleep(0.4)
-                    st.write("🧠 Searching by meaning (vector search)...")
-                    import time; time.sleep(0.4)
-                    st.write("⚖️ Combining results (Reciprocal Rank Fusion)...")
+                with st.status("Searching the Night Court...", expanded=True) as status:
+                    st.write("✦ Searching with keywords...")
+                    time.sleep(0.4)
+                    st.write("✦ Searching by meaning...")
+                    time.sleep(0.4)
+                    st.write("✦ Combining results...")
                     chunks = retrieve(prompt, vs, bm25, docs, metas)
-                    st.write("🎯 Reranking for precision (cross-encoder)...")
-                    import time; time.sleep(0.3)
-                    st.write("✍️ Generating answer with citations...")
-                    status.update(label="Found relevant passages", state="complete")
-                   
+                    st.write("✦ Reranking passages...")
+                    time.sleep(0.3)
+                    st.write("✦ Composing answer...")
+                    status.update(label="Passages found", state="complete")
 
-                # Stream the response
                 answer_placeholder = st.empty()
                 full_answer        = ""
                 final_sources      = []
@@ -90,19 +138,21 @@ with col1:
                     else:
                         final_sources = sources
 
-                # Final render without cursor
                 answer_placeholder.markdown(full_answer)
 
-                with st.expander("View Sources"):
-                    for s in final_sources:
-                        st.markdown(f"**{s['label']} — Page {s['page']}**")
-                        st.caption(s['text'][:300])
-                        st.divider()
+                # Suppress sources if LLM guardrail caught on output
+                is_blocked_output = (
+                    "I can only answer questions about A Court of Mist and Fury"
+                    in full_answer
+                )
+
+                if not is_blocked_output:
+                    render_sources(final_sources)
 
                 st.session_state.messages.append({
-                    "role": "assistant",
+                    "role":    "assistant",
                     "content": full_answer,
-                    "sources": final_sources
+                    "sources": [] if is_blocked_output else final_sources
                 })
 
             except Exception as e:
@@ -112,18 +162,3 @@ with col1:
                     "role": "assistant",
                     "content": error_msg
                 })
-
-with col2:
-    st.subheader("Session Stats")
-    total_questions = len([m for m in st.session_state.messages if m["role"] == "user"])
-    st.metric("Questions asked", total_questions)
-    st.metric("Chunks per answer", 5)
-    st.metric("Retrieval method", "Hybrid + Rerank")
-
-    st.divider()
-    st.subheader("About")
-    st.caption("This chatbot answers questions using only the text of the book. Every answer includes page citations so you can verify the source.")
-
-    if st.button("Clear conversation"):
-        st.session_state.messages = []
-        st.rerun()
