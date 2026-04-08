@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from retriever import load_vectorstore, build_bm25_index, retrieve
 from citation_chain import load_llm, answer_with_citations
 from code_grader import grade
-from ragas.metrics import faithfulness, answer_relevancy, context_precision
+from ragas.metrics.collections import faithfulness, answer_relevancy, context_precision
 from ragas import evaluate
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
