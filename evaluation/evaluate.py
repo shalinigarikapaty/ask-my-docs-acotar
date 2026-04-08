@@ -159,6 +159,8 @@ def check_thresholds(results) -> bool:
 
     passed = True
     for metric, score in scores.items():
+        if isinstance(score,list):
+            score = sum(score)/len(score)
         threshold = thresholds[metric]
         status    = "✓ PASS" if score >= threshold else "✗ FAIL"
         if score < threshold:
