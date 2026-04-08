@@ -6,12 +6,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from retriever import load_vectorstore, build_bm25_index, retrieve
 from citation_chain import load_llm, answer_with_citations
+from code_grader import grade
 from ragas.metrics import faithfulness, answer_relevancy, context_precision
 from ragas import evaluate
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from langchain_aws import ChatBedrock, BedrockEmbeddings
 from datasets import Dataset
+from ragas.run_config import RunConfig
 
 # ─── Configuration ───────────────────────────────────────
 EVAL_FILE        = "evaluation/eval_dataset.json"
@@ -45,14 +47,17 @@ def run_evaluation():
     dataset = dataset[:5]  # remove this line once everything works
     print(f"Loaded {len(dataset)} evaluation questions\n")
 
+    # ── Collect answers from pipeline (unchanged) ─────────
     questions     = []
     answers       = []
     contexts      = []
     ground_truths = []
+    types         = []  # NEW — track question type for routing
 
     for i, item in enumerate(dataset):
         question     = item["question"]
         ground_truth = item["ground_truth"]
+        q_type       = item.get("type", "descriptive")  # default to descriptive if missing
         print(f"[{i+1}/{len(dataset)}] {question}")
 
         try:
@@ -64,36 +69,80 @@ def run_evaluation():
             answers.append(answer)
             contexts.append(context)
             ground_truths.append(ground_truth)
+            types.append(q_type)  # NEW
 
-            time.sleep(3)  # wait 3 seconds between questions
+            time.sleep(3)
 
         except Exception as e:
             print(f"  ERROR: {e}")
             continue
 
-    print("\nRunning RAGAS evaluation...")
-    ragas_dataset = Dataset.from_dict({
-        "question":     questions,
-        "answer":       answers,
-        "contexts":     contexts,
-        "ground_truth": ground_truths
-    })
+    # ── Route each question to code grader or RAGAS ───────
+    code_results  = []   # questions handled by exact match
+    ragas_indices = []   # indices that need RAGAS
 
-    results = evaluate(
-        ragas_dataset,
-        metrics=[faithfulness, answer_relevancy, context_precision],
-        llm=ragas_llm,
-        embeddings=ragas_embeddings,
-        raise_exceptions=False,
-        run_config={"max_workers": 1}  # forces sequential, no parallel calls
-    )
+    print("\nRouting questions...")
+    for i, (q, a, gt, t) in enumerate(zip(questions, answers, ground_truths, types)):
+        result = grade(q, a, gt, t)
+        result["question"] = q
 
-    return results
+        if not result["escalate"]:
+            code_results.append(result)
+            status = "PASS" if result["passed"] else "FAIL"
+            print(f"  [CODE]  {status} | {q[:55]} | {result['detail']}")
+        else:
+            ragas_indices.append(i)
+            print(f"  [RAGAS] routed | {q[:55]}")
 
-# ─── Check thresholds ─────────────────────────────────────
-def check_thresholds(results):
+    # ── Run RAGAS only on escalated questions ─────────────
+    ragas_passed = True   # default if nothing routes to RAGAS
+
+    if ragas_indices:
+        print(f"\nRunning RAGAS on {len(ragas_indices)} questions...")
+        ragas_dataset = Dataset.from_dict({
+            "question":     [questions[i]     for i in ragas_indices],
+            "answer":       [answers[i]       for i in ragas_indices],
+            "contexts":     [contexts[i]      for i in ragas_indices],
+            "ground_truth": [ground_truths[i] for i in ragas_indices]
+        })
+
+        time.sleep(8)
+
+        results = evaluate(
+            ragas_dataset,
+            metrics=[faithfulness, answer_relevancy, context_precision],
+            llm=ragas_llm,
+            embeddings=ragas_embeddings,
+            raise_exceptions=False,
+            run_config=RunConfig(max_workers=1, timeout=60)
+        )
+
+        ragas_passed = check_thresholds(results)
+
+    # ── Code grader summary ────────────────────────────────
+    code_failures = [r for r in code_results if not r["passed"]]
+    code_passed   = len(code_failures) == 0
+
+    print(f"\n[CODE]  {len(code_results) - len(code_failures)}/{len(code_results)} passed")
+    if code_failures:
+        for f in code_failures:
+            # Disagreement log — code failed but was escalated to RAGAS
+            # If RAGAS passed this question, ground truth needs better variants
+            print(f"  [WARN] code=FAIL escalated to RAGAS: {f['question'][:60]} | {f['detail']}")
+
+    # ── Final quality gate ─────────────────────────────────
+    if code_passed and ragas_passed:
+        print("\n✓ ALL CHECKS PASSED")
+        sys.exit(0)
+    else:
+        print("\n✗ QUALITY GATE FAILED")
+        sys.exit(1)
+
+
+# ─── Check RAGAS thresholds ───────────────────────────────
+def check_thresholds(results) -> bool:
     print("\n" + "=" * 50)
-    print("EVALUATION RESULTS")
+    print("RAGAS RESULTS")
     print("=" * 50)
 
     scores = {
@@ -117,12 +166,8 @@ def check_thresholds(results):
         print(f"  {status}  {metric}: {score:.3f}  (min: {threshold})")
 
     print("=" * 50)
-    if passed:
-        print("✓ ALL CHECKS PASSED")
-    else:
-        print("✗ QUALITY GATE FAILED")
-        sys.exit(1)
+    return passed
+
 
 if __name__ == "__main__":
-    results = run_evaluation()
-    check_thresholds(results)
+    run_evaluation()
