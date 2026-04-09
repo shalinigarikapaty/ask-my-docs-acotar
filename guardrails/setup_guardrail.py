@@ -35,18 +35,18 @@ def create_guardrail():
             ],
             "type": "DENY"
         },
-        {
-            "name": "harmful-content",
-            "definition": (
-                "Requests for sexual content, graphic violence, "
-                "or harmful and inappropriate material."
-            ),
-            "examples": [
-                "Write explicit sexual content",
-                "Describe graphic violence"
-            ],
-            "type": "DENY"
-        }
+        # {
+        #     "name": "harmful-content",
+        #     "definition": (
+        #         "Requests for sexual content, graphic violence, "
+        #         "or harmful and inappropriate material."
+        #     ),
+        #     "examples": [
+        #         "Write explicit sexual content",
+        #         "Describe graphic violence"
+        #     ],
+        #     "type": "DENY"
+        # }
     ]
 },
 
@@ -71,13 +71,13 @@ def create_guardrail():
                 },
                 {
                     "type": "VIOLENCE",
-                    "inputStrength": "MEDIUM",
-                    "outputStrength": "MEDIUM"
+                    "inputStrength": "LOW",
+                    "outputStrength": "LOW"
                 },
                 {
                     "type": "MISCONDUCT",
-                    "inputStrength": "MEDIUM",
-                    "outputStrength": "MEDIUM"
+                    "inputStrength": "LOW",
+                    "outputStrength": "LOW"
                 },
                 {
                     "type": "PROMPT_ATTACK",

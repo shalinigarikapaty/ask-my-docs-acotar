@@ -80,10 +80,24 @@ def rerank(query, candidates, top_k=TOP_K_FINAL):
         key=lambda x: x[0],
         reverse=True
     )
-    return [c for _, c in ranked[:top_k]]
+    top = ranked[:top_k]
+    return [c for _, c in top], [float(s) for s, _ in top]
+
+# ─── Confidence level from top reranker score ─────────────
+def score_to_confidence(scores: list) -> str:
+    if not scores:
+        return "none"
+    top = scores[0]
+    if top < 0.1:
+        return "low"
+    if top < 0.3:
+        return "moderate"
+    return "high"
 
 # ─── Full pipeline ────────────────────────────────────────
 def retrieve(query, vectorstore, bm25, documents, metadatas):
-    candidates  = hybrid_retrieve(query, vectorstore, bm25, documents, metadatas)
-    top_chunks  = rerank(query, candidates)
-    return top_chunks
+    candidates          = hybrid_retrieve(query, vectorstore, bm25, documents, metadatas)
+    top_chunks, scores  = rerank(query, candidates)
+    confidence          = score_to_confidence(scores)
+    print(f"Confidence: {confidence} (top score: {scores[0]:.4f})" if scores else "Confidence: none")
+    return top_chunks, confidence
