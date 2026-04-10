@@ -2,6 +2,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_aws import BedrockEmbeddings
 from langchain_community.vectorstores import Chroma
+from config import AWS_REGION, EMBEDDING_MODEL, CHROMA_DIR
 
 # Load PDF
 loader = PyPDFLoader("data/ACOTAR_MistAndFury.pdf")
@@ -18,15 +19,15 @@ print(f"Total chunks: {len(chunks)}")
 
 # Connect to Amazon Titan on AWS
 embeddings = BedrockEmbeddings(
-    model_id="amazon.titan-embed-text-v2:0",
-    region_name="us-east-1"
+    model_id=EMBEDDING_MODEL,
+    region_name=AWS_REGION
 )
 
 # Store vectors in ChromaDB locally
 vectorstore = Chroma.from_documents(
     documents=chunks,
     embedding=embeddings,
-    persist_directory="./chroma_db"
+    persist_directory=CHROMA_DIR
 )
 
 print("Done! Vectors saved to ./chroma_db")

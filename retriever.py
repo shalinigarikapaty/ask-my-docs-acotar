@@ -4,11 +4,7 @@ from langchain_aws import BedrockEmbeddings
 from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder
 import numpy as np
-
-# ─── Configuration ───────────────────────────────────────
-EMBEDDING_MODEL   = "amazon.titan-embed-text-v2:0"
-REGION            = "us-east-1"
-CHROMA_DIR        = "./chroma_db"
+from config import AWS_REGION, EMBEDDING_MODEL, CHROMA_DIR
 TOP_K_RETRIEVAL   = 20   # candidates from each retriever
 TOP_K_FINAL       = 5    # final chunks after reranking
 RERANKER_MODEL    = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -17,7 +13,7 @@ RERANKER_MODEL    = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 def load_vectorstore():
     embeddings = BedrockEmbeddings(
         model_id=EMBEDDING_MODEL,
-        region_name=REGION
+        region_name=AWS_REGION
     )
     return Chroma(
         persist_directory=CHROMA_DIR,

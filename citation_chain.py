@@ -1,25 +1,16 @@
 from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-# ─── Load Configuration ───────────────────────────────────────
-LLM_MODEL   = os.getenv("LLM_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
-REGION      = os.getenv("AWS_REGION", "us-east-1")
-TEMPERATURE = float(os.getenv("TEMPERATURE", "0.3"))
-GUARDRAIL_ID      = os.getenv("GUARDRAIL_ID")
-GUARDRAIL_VERSION = os.getenv("GUARDRAIL_VERSION", "1")
+from config import AWS_REGION, LLM_MODEL, TEMPERATURE, MAX_TOKENS, GUARDRAIL_ID, GUARDRAIL_VERSION
 
 # ─── Load LLM ────────────────────────────────────────────
 def load_llm():
     llm_kwargs = {
         "model_id":    LLM_MODEL,
-        "region_name": REGION,
+        "region_name": AWS_REGION,
         "streaming":   True,
         "model_kwargs": {
             "temperature":   TEMPERATURE,
-            "max_tokens":    int(os.getenv("MAX_TOKENS", "700")),
+            "max_tokens":    MAX_TOKENS,
             "stop_sequences": [
                 "\nHuman:",
                 "\nQuestion:",

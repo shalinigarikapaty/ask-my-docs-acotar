@@ -5,12 +5,12 @@ Prints GUARDRAIL_ID and GUARDRAIL_VERSION to add to .env
 """
 
 import boto3
+import sys
 import os
-from dotenv import load_dotenv
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import AWS_REGION
 
-load_dotenv()
-
-client = boto3.client("bedrock", region_name=os.getenv("AWS_REGION", "us-east-1"))
+client = boto3.client("bedrock", region_name=AWS_REGION)
 
 def create_guardrail():
     response = client.create_guardrail(
@@ -52,33 +52,36 @@ def create_guardrail():
 
         # ── Content filters ───────────────────────────────────────────
         # AWS-managed filters for hate, harassment, prompt injection
-        contentPolicyConfig={
-            "filtersConfig": [
-                {
-                    "type": "HATE",
-                    "inputStrength": "HIGH",
-                    "outputStrength": "HIGH"
-                },
-                {
-                    "type": "INSULTS",
-                    "inputStrength": "MEDIUM",
-                    "outputStrength": "MEDIUM"
-                },
-                {
-                    "type": "SEXUAL",
-                    "inputStrength": "HIGH",
-                    "outputStrength": "HIGH"
-                },
-                {
-                    "type": "VIOLENCE",
-                    "inputStrength": "LOW",
-                    "outputStrength": "LOW"
-                },
-                {
-                    "type": "MISCONDUCT",
-                    "inputStrength": "LOW",
-                    "outputStrength": "LOW"
-                },
+        # Commented out — over-triggering on ACOMAF dark fantasy themes
+        # (resurrection, violence, morally ambiguous plot content).
+        # Re-enable and tune per-filter once false positives are resolved.
+         contentPolicyConfig={
+                "filtersConfig": [
+        #         {
+        #             "type": "HATE",
+        #             "inputStrength": "HIGH",
+        #             "outputStrength": "HIGH"
+        #         },
+        #         {
+        #             "type": "INSULTS",
+        #             "inputStrength": "MEDIUM",
+        #             "outputStrength": "MEDIUM"
+        #         },
+        #         {
+        #             "type": "SEXUAL",
+        #             "inputStrength": "HIGH",
+        #             "outputStrength": "HIGH"
+        #         },
+        #         {
+        #             "type": "VIOLENCE",
+        #             "inputStrength": "MEDIUM",
+        #             "outputStrength": "MEDIUM"
+        #         },
+        #         {
+        #             "type": "MISCONDUCT",
+        #             "inputStrength": "LOW",
+        #             "outputStrength": "LOW"
+        #         },
                 {
                     "type": "PROMPT_ATTACK",
                     "inputStrength": "HIGH",

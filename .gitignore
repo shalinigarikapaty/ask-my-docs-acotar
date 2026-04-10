@@ -2,6 +2,8 @@ venv/
 chroma_db/
 data/
 .env
+*.pdf
 __pycache__/
 *.pyc
 .DS_Store
+.streamlit/secrets.toml

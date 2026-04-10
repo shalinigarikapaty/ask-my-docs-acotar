@@ -1,9 +1,9 @@
 import streamlit as st
 import boto3
-import os
 import time
 from retriever import load_vectorstore, build_bm25_index, retrieve
 from citation_chain import load_llm, stream_answer_with_citations
+from config import AWS_REGION, GUARDRAIL_ID, GUARDRAIL_VERSION
 from ui import (
     inject_theme, render_title, render_watermark,
     render_source_cards, render_blocked, render_sidebar,
@@ -65,20 +65,17 @@ def is_blocked_by_guardrail(question: str) -> tuple:
         return True, BLOCKED_MESSAGE, False
 
     # Layer 2 — Bedrock guardrail
-    guardrail_id      = os.getenv("GUARDRAIL_ID")
-    guardrail_version = os.getenv("GUARDRAIL_VERSION", "1")
-
-    if not guardrail_id:
+    if not GUARDRAIL_ID:
         return False, "", False
 
     try:
         client = boto3.client(
             "bedrock-runtime",
-            region_name=os.getenv("AWS_REGION", "us-east-1")
+            region_name=AWS_REGION
         )
         response = client.apply_guardrail(
-            guardrailIdentifier=guardrail_id,
-            guardrailVersion=guardrail_version,
+            guardrailIdentifier=GUARDRAIL_ID,
+            guardrailVersion=GUARDRAIL_VERSION,
             source="INPUT",
             content=[{"text": {"text": question}}]
         )

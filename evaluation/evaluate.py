@@ -7,6 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from retriever import load_vectorstore, build_bm25_index, retrieve
 from citation_chain import load_llm, answer_with_citations
 from code_grader import grade
+from config import AWS_REGION, LLM_MODEL, EMBEDDING_MODEL
 from ragas.metrics.collections import faithfulness, answer_relevancy, context_precision
 from ragas import evaluate
 from ragas.llms import LangchainLLMWrapper
@@ -35,12 +36,12 @@ def run_evaluation():
 
     # Tell RAGAS to use Bedrock instead of OpenAI
     ragas_llm = LangchainLLMWrapper(ChatBedrock(
-        model_id="us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        region_name="us-east-1"
+        model_id=LLM_MODEL,
+        region_name=AWS_REGION
     ))
     ragas_embeddings = LangchainEmbeddingsWrapper(BedrockEmbeddings(
-        model_id="amazon.titan-embed-text-v2:0",
-        region_name="us-east-1"
+        model_id=EMBEDDING_MODEL,
+        region_name=AWS_REGION
     ))
 
     dataset = load_eval_dataset()
@@ -61,8 +62,8 @@ def run_evaluation():
         print(f"[{i+1}/{len(dataset)}] {question}")
 
         try:
-            chunks          = retrieve(question, vs, bm25, docs, metas)
-            answer, sources = answer_with_citations(question, chunks, llm)
+            chunks, confidence = retrieve(question, vs, bm25, docs, metas)
+            answer, sources    = answer_with_citations(question, chunks, llm, confidence=confidence)
             context         = [c["doc"] for c in chunks]
 
             questions.append(question)
