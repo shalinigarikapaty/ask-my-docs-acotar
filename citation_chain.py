@@ -2,6 +2,21 @@ from langchain_aws import ChatBedrock
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from config import AWS_REGION, LLM_MODEL, TEMPERATURE, MAX_TOKENS, GUARDRAIL_ID, GUARDRAIL_VERSION
 
+# ─── Safe token extractor ─────────────────────────────────
+# langchain-aws ≥ 0.2 (Converse API) returns AIMessageChunk.content
+# as list[dict] for structured responses, not always a plain str.
+# This helper normalises both cases so the streaming loop never crashes.
+def _extract_text(chunk) -> str:
+    content = chunk.content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in content
+        )
+    return ""
+
 # ─── Load LLM ────────────────────────────────────────────
 def load_llm():
     llm_kwargs = {
@@ -67,12 +82,18 @@ def stream_answer_with_citations(question, chunks, llm, chat_history=None, confi
 
     # Stream tokens as they arrive
     full_response = ""
+    chunk_count   = 0
     for chunk in llm.stream(messages):
-        token = chunk.content
+        token = _extract_text(chunk)
+        if not token:          # skip empty metadata/usage chunks Bedrock emits
+            continue
+        chunk_count   += 1
         full_response += token
-        yield token, None  # yield token, sources not ready yet
+        print(f"[stream] chunk #{chunk_count} ({len(token)} chars): {repr(token[:40])}")
+        yield token, None      # yield token; sources not ready yet
 
-    yield None, sources  # final yield — signals completion with sources
+    print(f"[stream] complete — {chunk_count} chunks, {len(full_response)} chars total")
+    yield None, sources        # final yield — signals completion with sources
 # ─── Confidence context injected into user message ───────
 _CONFIDENCE_LINES = {
     "high":     "[CONFIDENCE: high] Strong match found in the book passages — answer normally.",
