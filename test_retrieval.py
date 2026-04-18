@@ -19,7 +19,8 @@ def main():
     for q in QUESTIONS:
         print(f"QUESTION: {q}")
         print("-" * 60)
-        results = retrieve(q, vs, bm25, docs, metas)
+        results, confidence = retrieve(q, vs, bm25, docs, metas)
+        print(f"  Confidence: {confidence}")
         for i, r in enumerate(results):
             page = r["meta"].get("page", "?")
             print(f"  Chunk {i+1} (page {page}):")

@@ -5,6 +5,7 @@ Readability fix: darker ink, stronger contrast on cream background.
 
 import re
 import streamlit as st
+from config import AUTHOR_NAME
 
 
 # ─── Citation pill post-processor ────────────────────────
@@ -423,13 +424,14 @@ def render_sidebar(messages: list):
 
         st.divider()
 
-        st.markdown(
-            '<div class="sidebar-credit">'
-            'A reader\'s guide, kept by<br>'
-            '<strong>Shalini Garikapati</strong>'
-            '</div>',
-            unsafe_allow_html=True
-        )
+        if AUTHOR_NAME:
+            st.markdown(
+                f'<div class="sidebar-credit">'
+                f'A reader\'s guide, kept by<br>'
+                f'<strong>{AUTHOR_NAME}</strong>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
 
         st.divider()
 
