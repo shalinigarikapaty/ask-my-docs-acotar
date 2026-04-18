@@ -8,6 +8,8 @@ Built to demonstrate a full RAG engineering stack: hybrid retrieval, cross-encod
 
 ## Demo
 
+[![Watch the demo](https://img.shields.io/badge/Loom-Watch%20Demo-625DF5?style=for-the-badge&logo=loom&logoColor=white)](https://www.loom.com/share/d80604ad6edb4d5183c54dcd1e3056f8)
+
 ![Chatbot UI](assets/demo.png)
 
 ---
